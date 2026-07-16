@@ -329,19 +329,42 @@ class Agent:
 
 
 if __name__ == "__main__":
-    from ui_cli import LiveRenderer
+    import argparse
+    import sys
 
-    config = Config.from_yaml()
+    parser = argparse.ArgumentParser(description="UE Agent harness")
+    # ponytail: cli-builder Pattern 3 — --json emits a pure machine-readable contract on stdout
+    parser.add_argument("--json", action="store_true", help="Emit run result as JSON (no other stdout)")
+    parser.add_argument("--config", default=None, help="Path to config.yaml")
+    parser.add_argument("task", nargs="*", help="Task text (or pipe via stdin in --json mode)")
+    args = parser.parse_args()
+
+    config = Config.from_yaml(args.config) if args.config else Config.from_yaml()
     agent = Agent(config)
-    print("UE Agent — type a task (Ctrl-C to quit)")
-    try:
-        while True:
-            task = input("> ").strip()  # ponytail: one-shot REPL, no history/state
-            if task:
-                with LiveRenderer() as r:
-                    agent.on_event = r.on_event
-                    result = agent.run(task)
-                    agent.on_event = None
-                print(result)
-    except (EOFError, KeyboardInterrupt):
-        print("\nbye")
+
+    if args.json:
+        # Single-shot, machine-consumable: collect events, emit one JSON object, no auxiliary text.
+        events: list[dict] = []
+        agent.on_event = lambda t, **kw: events.append({"type": t, **kw})
+        prompt = " ".join(args.task).strip() or (sys.stdin.read().strip() if not sys.stdin.isatty() else "")
+        if not prompt:
+            print(json.dumps({"error": "no prompt provided (arg or stdin)"}, ensure_ascii=False))
+            sys.exit(2)
+        result = agent.run(prompt)
+        agent.on_event = None
+        print(json.dumps({"prompt": prompt, "events": events, "result": result}, ensure_ascii=False))
+    else:
+        from ui_cli import LiveRenderer
+
+        print("UE Agent — type a task (Ctrl-C to quit)")
+        try:
+            while True:
+                task = input("> ").strip()  # ponytail: one-shot REPL, no history/state
+                if task:
+                    with LiveRenderer() as r:
+                        agent.on_event = r.on_event
+                        result = agent.run(task)
+                        agent.on_event = None
+                    print(result)
+        except (EOFError, KeyboardInterrupt):
+            print("\nbye")

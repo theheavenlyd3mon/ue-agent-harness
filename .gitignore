@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.venv/
+env/
+venv/
+
+# Hermes / session artifacts
+sessions/
+memory.db
+*.db-journal
+progress.md
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Bridge runtime state
+bridge/bridge.json
+*.log

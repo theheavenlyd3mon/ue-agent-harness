@@ -5,7 +5,7 @@ import re
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -167,7 +167,7 @@ class Agent:
             return {"error": str(e)}
 
     def run(self, user_prompt: str) -> str:
-        session_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        session_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         session_path = Path("sessions") / f"{session_id}.jsonl"
         session_path.parent.mkdir(parents=True, exist_ok=True)
         metrics = SessionMetrics(session_id=session_id, task=user_prompt)
@@ -312,7 +312,7 @@ class Agent:
         path = Path(self.config.journal_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a") as f:
-            f.write(f"\n## {datetime.utcnow().isoformat()}\n\n")
+            f.write(f"\n## {datetime.now(timezone.utc).isoformat()}\n\n")
             f.write(f"**Task:** {prompt}\n\n")
             f.write(f"**Summary:** {summary}\n")
 

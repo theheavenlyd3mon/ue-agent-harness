@@ -88,6 +88,7 @@ class LLM:
 class Agent:
     def __init__(self, config: Config):
         self.config = config
+        self.on_event: Any = None  # ponytail: hook -> fn(event_type, **kw); feeds CLI/TUI renderers
         self.llm = LLM(config)
         self.bridge = Bridge(
             bridge_type=config.bridge_type,
@@ -153,6 +154,10 @@ class Agent:
     def _tool_schemas(self) -> list[dict]:
         return schemas_from_registry(self.tools) + self.mcp_tool_schemas
 
+    def _emit(self, event_type: str, **kw: Any) -> None:
+        if self.on_event:
+            self.on_event(event_type, **kw)
+
     def _call_tool(self, name: str, args: dict) -> Any:
         if self.config.approval_mode == "readonly" and name not in READONLY_TOOLS:
             return {"error": f"Readonly mode: {name} is not allowed."}
@@ -161,10 +166,14 @@ class Agent:
         tool = self.tools.get(name)
         if not tool:
             return {"error": f"Unknown tool: {name}"}
+        call_id = uuid.uuid4().hex[:8]  # ponytail: local id to match start<->complete in renderer
+        self._emit("tool.start", id=call_id, name=name, args=args)
         try:
-            return {"result": tool(**args)}
+            result = {"result": tool(**args)}
         except Exception as e:
-            return {"error": str(e)}
+            result = {"error": str(e)}
+        self._emit("tool.complete", id=call_id, name=name, result=result)
+        return result
 
     def run(self, user_prompt: str) -> str:
         session_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -179,6 +188,7 @@ class Agent:
 
         plan = self._plan(user_prompt)
         if plan:
+            self._emit("plan", steps=plan)
             plan_summary = "Plan:\n" + "\n".join(
                 f"{i+1}. {step.get('tool', '?')} — {step.get('reason', '')}"
                 for i, step in enumerate(plan)
@@ -208,6 +218,7 @@ class Agent:
                     metrics.save(Path("sessions") / "metrics.jsonl")
                     self._append_journal(user_prompt, response["content"])
                     self._remember_outcome(user_prompt, response["content"])
+                    self._emit("result", content=response["content"])
                     return response["content"]
 
                 for call in response.get("tool_calls", []):
@@ -318,7 +329,19 @@ class Agent:
 
 
 if __name__ == "__main__":
+    from ui_cli import LiveRenderer
+
     config = Config.from_yaml()
     agent = Agent(config)
-    result = agent.run("Add a stamina attribute to the player character.")
-    print(result)
+    print("UE Agent — type a task (Ctrl-C to quit)")
+    try:
+        while True:
+            task = input("> ").strip()  # ponytail: one-shot REPL, no history/state
+            if task:
+                with LiveRenderer() as r:
+                    agent.on_event = r.on_event
+                    result = agent.run(task)
+                    agent.on_event = None
+                print(result)
+    except (EOFError, KeyboardInterrupt):
+        print("\nbye")

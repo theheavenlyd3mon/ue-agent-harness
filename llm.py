@@ -4,6 +4,10 @@ import os
 import json
 from typing import Any
 
+from dotenv import load_dotenv
+
+load_dotenv()  # ponytail: pull .env secrets into os.environ before client init
+
 
 class LLM:
     def __init__(self, config: Any):

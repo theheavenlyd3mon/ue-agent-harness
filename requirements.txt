@@ -1,6 +1,7 @@
 pyyaml
 anthropic
 openai
+python-dotenv
 mnemosyne-hermes
 mnemosyne-memory
 textual

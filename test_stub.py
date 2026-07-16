@@ -118,6 +118,27 @@ def test_build_retry_counter(tmpdir: Path):
     assert agent.config.max_build_retries == 2
 
 
+def test_planner_returns_steps(tmpdir: Path):
+    config = make_test_config(tmpdir)
+    agent = Agent(config)
+
+    class FakeLLM:
+        def invoke(self, messages, tools=None):
+            return {"role": "assistant", "content": '```json\n[{"tool": "scan_project", "reason": "Discover the project layout."}]\n```', "tool_calls": None}
+
+    agent.llm = FakeLLM()
+    plan = agent._plan("add stamina")
+    assert len(plan) >= 1
+    assert plan[0]["tool"] == "scan_project"
+
+
+def test_config_yaml_loads():
+    config = Config.from_yaml("config.yaml")
+    assert config.approval_mode in ("auto", "ask", "readonly")
+    assert config.uproject_path
+    assert config.default_module
+
+
 def test_e2e_stub_write_and_build(tmpdir: Path):
     tmpdir = Path(str(tmpdir))
     uproject = tmpdir / "MurimSouls.uproject"
@@ -137,6 +158,30 @@ def test_e2e_stub_write_and_build(tmpdir: Path):
     agent.llm = FakeLLM(config)
     result = agent.run("Add a stamina attribute to the player character.")
     assert "Done" in result
+    # Verify progress.md was written by agent
+    progress = tmpdir / "progress.md"
+    assert progress.exists(), "progress.md should have been written by agent"
+    content = progress.read_text()
+    assert "Add a stamina attribute" in content
+
+
+def test_mcp_disabled_by_default(tmpdir: Path):
+    config = make_test_config(tmpdir)
+    agent = Agent(config)
+    assert agent.mcp_client is None
+
+
+def test_metrics_save(tmpdir: Path):
+    from eval.metrics import SessionMetrics
+    tmpdir = Path(str(tmpdir))
+    m = SessionMetrics(session_id="123", task="test")
+    m.record_tool("write_file")
+    m.build_success = True
+    m.save(tmpdir / "metrics.jsonl")
+    lines = (tmpdir / "metrics.jsonl").read_text().splitlines()
+    data = json.loads(lines[0])
+    assert data["tool_calls"]["write_file"] == 1
+    assert data["build_success"] is True
 
 
 if __name__ == "__main__":

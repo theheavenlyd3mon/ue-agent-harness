@@ -1,0 +1,11 @@
+pyyaml
+anthropic
+openai
+mnemosyne-hermes
+mnemosyne-memory
+textual
+rich
+
+# Optional extras:
+# pytest          # testing
+# ue-python       # Unreal remote execution

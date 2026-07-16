@@ -1,0 +1,27 @@
+project:
+  uproject_path: "C:/Projects/MurimSouls/MurimSouls.uproject"
+  default_module: "MurimSouls"
+
+bridge:
+  type: "stub"              # stub | file
+  file_path: "./bridge/bridge.json"
+  poll_interval: 0.5
+  timeout: 30.0
+
+llm:
+  provider: "anthropic"      # anthropic | openai | openrouter | ollama | lmstudio
+  model: "claude-sonnet-4"
+  api_key_env: "ANTHROPIC_API_KEY"
+  base_url: ""
+
+agent:
+  max_build_retries: 3
+  memory_enabled: true
+  journal_path: "./progress.md"
+  db_path: "./memory.db"
+  approval_mode: "auto"      # auto | ask | readonly
+  allowed_paths: []           # extra paths outside the project tree
+
+mcp:
+  enabled: false
+  servers: {}
